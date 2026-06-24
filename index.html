@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Ticket System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f0f23;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; color: #00d4aa; margin-bottom: 10px; font-size: 2rem; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+        
+        /* Navigation */
+        .nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: #1a1a2e;
+            padding: 5px;
+            border-radius: 12px;
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        .nav-btn.active {
+            background: #00d4aa;
+            color: #0f0f23;
+        }
+        .nav-btn:hover:not(.active) { color: #fff; }
+        
+        /* Sections */
+        .section { display: none; animation: fadeIn 0.3s; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Cards */
+        .card {
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid #2a2a4e;
+        }
+        .card h2 { color: #00d4aa; margin-bottom: 16px; font-size: 1.3rem; }
+        
+        /* Form */
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; color: #aaa; font-size: 0.9rem; }
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #2a2a4e;
+            background: #0f0f23;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus { border-color: #00d4aa; }
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary {
+            background: #00d4aa;
+            color: #0f0f23;
+        }
+        .btn-primary:hover { background: #00f5c4; transform: translateY(-2px); }
+        .btn-danger { background: #ff4757; color: #fff; }
+        .btn-danger:hover { background: #ff6b81; }
+        .btn-secondary { background: #2a2a4e; color: #fff; }
+        .btn-secondary:hover { background: #3a3a6e; }
+        
+        /* QR Display */
+        .qr-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .qr-card {
+            background: #0f0f23;
+            border: 1px solid #2a2a4e;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            position: relative;
+        }
+        .qr-card .name { font-weight: 600; color: #fff; margin-bottom: 4px; }
+        .qr-card .type { color: #00d4aa; font-size: 0.85rem; margin-bottom: 8px; }
+        .qr-card .code { font-family: monospace; color: #888; font-size: 0.75rem; margin-bottom: 12px; }
+        .qr-card .status {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00d4aa;
+        }
+        .qr-card .status.used { background: #ff4757; }
+        .qr-card .status.pending { background: #ffa502; }
+        .qr-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
+        
+        /* Scanner */
+        #reader {
+            width: 100% !important;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #2a2a4e;
+        }
+        #reader video {
+            border-radius: 12px;
+        }
+        .scan-result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+        }
+        .scan-result.valid { background: rgba(0, 212, 170, 0.1); border: 2px solid #00d4aa; display: block; }
+        .scan-result.invalid { background: rgba(255, 71, 87, 0.1); border: 2px solid #ff4757; display: block; }
+        .scan-result.used { background: rgba(255, 165, 2, 0.1); border: 2px solid #ffa502; display: block; }
+        .scan-icon { font-size: 3rem; margin-bottom: 10px; }
+        .scan-result h3 { margin-bottom: 8px; }
+        .scan-result p { color: #aaa; }
+        
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: #0f0f23;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #2a2a4e;
+        }
+        .stat-box .number { font-size: 2rem; font-weight: 700; color: #00d4aa; }
+        .stat-box .label { color: #888; font-size: 0.9rem; margin-top: 4px; }
+        
+        /* Table */
+        .ticket-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        .ticket-table th, .ticket-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #2a2a4e;
+        }
+        .ticket-table th { color: #00d4aa; font-weight: 600; }
+        .ticket-table tr:hover { background: rgba(0, 212, 170, 0.05); }
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-valid { background: rgba(0, 212, 170, 0.2); color: #00d4aa; }
+        .badge-used { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+        .badge-pending { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
+        
+        .actions { display: flex; gap: 8px; }
+        .actions button { padding: 6px 12px; font-size: 0.8rem; }
+        
+        /* Export */
+        .export-area {
+            margin-top: 16px;
+            padding: 16px;
+            background: #0f0f23;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #888;
+            max-height: 200px;
+            overflow-y: auto;
+            word-break: break-all;
+        }
+        
+        /* Print styles */
+        @media print {
+            body { background: #fff; color: #000; }
+            .nav, .no-print { display: none !important; }
+            .section { display: block !important; }
+            .qr-card { break-inside: avoid; border: 1px solid #ccc; }
+        }
+        
+        /* Mobile */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.5rem; }
+            .qr-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Party Ticket System</h1>
+        <p class="subtitle">Generate & Verify QR Codes for Paid Guests</p>
+        
+        <div class="nav">
+            <button class="nav-btn active" onclick="showSection('generator')">🎫 Generate Tickets</button>
+            <button class="nav-btn" onclick="showSection('scanner')">📷 Scan & Verify</button>
+            <button class="nav-btn" onclick="showSection('manage')">📋 Manage Tickets</button>
+        </div>
+        
+        <!-- GENERATOR SECTION -->
+        <div id="generator" class="section active">
+            <div class="card">
+                <h2>Create New Ticket</h2>
+                <div class="form-group">
+                    <label>Guest Name</label>
+                    <input type="text" id="guestName" placeholder="Enter guest name..." autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Ticket Type</label>
+                    <select id="ticketType">
+                        <option value="General">General Admission</option>
+                        <option value="VIP">VIP Access</option>
+                        <option value="Early">Early Bird</option>
+                        <option value="Staff">Staff</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount Paid ($)</label>
+                    <input type="number" id="amountPaid" placeholder="0.00" min="0" step="0.01">
+                </div>
+                <button class="btn btn-primary" onclick="generateTicket()">
+                    ➕ Generate Ticket & QR Code
+                </button>
+            </div>
+            
+            <div class="card no-print">
+                <h2>Quick Stats</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="number" id="statTotal">0</div>
+                        <div class="label">Total Tickets</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" id="statValid">0</div>
+                        <div class="label">Valid</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" id="statUsed">0</div>
+                        <div class="label">Used</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="number" id="statRevenue">$0</div>
+                        <div class="label">Revenue</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" id="qrSection" style="display:none;">
+                <h2 class="no-print">Generated Tickets</h2>
+                <div class="no-print" style="margin-bottom: 16px;">
+                    <button class="btn btn-secondary" onclick="printTickets()">🖨️ Print All Tickets</button>
+                    <button class="btn btn-secondary" onclick="exportData()" style="margin-left: 8px;">💾 Export Data</button>
+                    <button class="btn btn-danger" onclick="clearAll()" style="margin-left: 8px;">🗑️ Clear All</button>
+                </div>
+                <div id="qrContainer" class="qr-grid"></div>
+            </div>
+        </div>
+        
+        <!-- SCANNER SECTION -->
+        <div id="scanner" class="section">
+            <div class="card">
+                <h2>Scan Ticket QR Code</h2>
+                <p style="color: #888; margin-bottom: 16px;">Point camera at a guest's QR code to verify</p>
+                <div id="reader"></div>
+                <div id="scanResult" class="scan-result">
+                    <div class="scan-icon" id="scanIcon">✅</div>
+                    <h3 id="scanTitle">Valid Ticket</h3>
+                    <p id="scanMessage">Welcome to the party!</p>
+                </div>
+                <button class="btn btn-secondary no-print" onclick="resetScanner()" style="margin-top: 16px; display:none;" id="scanAgain">
+                    🔄 Scan Another
+                </button>
+            </div>
+        </div>
+        
+        <!-- MANAGE SECTION -->
+        <div id="manage" class="section">
+            <div class="card">
+                <h2>All Tickets</h2>
+                <div style="margin-bottom: 16px;">
+                    <input type="text" id="searchTickets" placeholder="🔍 Search by name or code..." 
+                           oninput="renderTable()" style="max-width: 300px;">
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="ticket-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Code</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ticketTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="exportArea" class="export-area" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data storage
+        let tickets = JSON.parse(localStorage.getItem('partyTickets')) || [];
+        let scanner = null;
+        
+        // Generate unique code
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return 'PT-' + code; // PT = Party Ticket
+        }
+        
+        // Generate ticket
+        function generateTicket() {
+            const name = document.getElementById('guestName').value.trim();
+            const type = document.getElementById('ticketType').value;
+            const amount = parseFloat(document.getElementById('amountPaid').value) || 0;
+            
+            if (!name) {
+                alert('Please enter a guest name');
+                return;
+            }
+            
+            const ticket = {
+                id: Date.now(),
+                code: generateCode(),
+                name: name,
+                type: type,
+                amount: amount,
+                status: 'valid', // valid, used, pending
+                created: new Date().toLocaleString(),
+                usedAt: null
+            };
+            
+            tickets.push(ticket);
+            saveTickets();
+            
+            // Clear inputs
+            document.getElementById('guestName').value = '';
+            document.getElementById('amountPaid').value = '';
+            
+            // Show and render
+            document.getElementById('qrSection').style.display = 'block';
+            renderQRs();
+            updateStats();
+            renderTable();
+        }
+        
+        // Save to localStorage
+        function saveTickets() {
+            localStorage.setItem('partyTickets', JSON.stringify(tickets));
+        }
+        
+        // Render QR codes
+        function renderQRs() {
+            const container = document.getElementById('qrContainer');
+            container.innerHTML = '';
+            
+            tickets.forEach(ticket => {
+                const card = document.createElement('div');
+                card.className = 'qr-card';
+                const statusClass = ticket.status === 'used' ? 'used' : ticket.status === 'pending' ? 'pending' : '';
+                
+                card.innerHTML = `
+                    <div class="status ${statusClass}"></div>
+                    <div class="name">${escapeHtml(ticket.name)}</div>
+                    <div class="type">${ticket.type}</div>
+                    <div class="code">${ticket.code}</div>
+                    <div class="qr-wrap" id="qr-${ticket.id}"></div>
+                    <div style="font-size: 0.75rem; color: #666;">
+                        ${ticket.status === 'used' ? '✓ Used ' + ticket.usedAt : 'Valid'}
+                    </div>
+                `;
+                container.appendChild(card);
+                
+                // Generate QR
+                setTimeout(() => {
+                    new QRCode(document.getElementById(`qr-${ticket.id}`), {
+                        text: ticket.code,
+                        width: 128,
+                        height: 128,
+                        colorDark: ticket.status === 'used' ? '#ff4757' : '#00d4aa',
+                        colorLight: '#0f0f23',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                }, 10);
+            });
+        }
+        
+        // Update stats
+        function updateStats() {
+            const total = tickets.length;
+            const valid = tickets.filter(t => t.status === 'valid').length;
+            const used = tickets.filter(t => t.status === 'used').length;
+            const revenue = tickets.reduce((sum, t) => sum + t.amount, 0);
+            
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statValid').textContent = valid;
+            document.getElementById('statUsed').textContent = used;
+            document.getElementById('statRevenue').textContent = '$' + revenue.toFixed(2);
+        }
+        
+        // Render table
+        function renderTable() {
+            const tbody = document.getElementById('ticketTableBody');
+            const search = document.getElementById('searchTickets').value.toLowerCase();
+            
+            let filtered = tickets;
+            if (search) {
+                filtered = tickets.filter(t => 
+                    t.name.toLowerCase().includes(search) || 
+                    t.code.toLowerCase().includes(search)
+                );
+            }
+            
+            tbody.innerHTML = filtered.map(t => `
+                <tr>
+                    <td><span class="badge badge-${t.status}">${t.status}</span></td>
+                    <td>${escapeHtml(t.name)}</td>
+                    <td>${t.type}</td>
+                    <td>$${t.amount.toFixed(2)}</td>
+                    <td><code>${t.code}</code></td>
+                    <td>${t.created}</td>
+                    <td>
+                        <div class="actions">
+                            ${t.status === 'valid' ? 
+                                `<button class="btn btn-primary" onclick="markUsed(${t.id})">Check In</button>` : 
+                                `<button class="btn btn-secondary" onclick="markValid(${t.id})">Reset</button>`
+                            }
+                            <button class="btn btn-danger" onclick="deleteTicket(${t.id})">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // Actions
+        function markUsed(id) {
+            const t = tickets.find(x => x.id === id);
+            if (t) {
+                t.status = 'used';
+                t.usedAt = new Date().toLocaleString();
+                saveTickets();
+                updateStats();
+                renderTable();
+                renderQRs();
+            }
+        }
+        
+        function markValid(id) {
+            const t = tickets.find(x => x.id === id);
+            if (t) {
+                t.status = 'valid';
+                t.usedAt = null;
+                saveTickets();
+                updateStats();
+                renderTable();
+                renderQRs();
+            }
+        }
+        
+        function deleteTicket(id) {
+            if (confirm('Delete this ticket?')) {
+                tickets = tickets.filter(t => t.id !== id);
+                saveTickets();
+                updateStats();
+                renderTable();
+                renderQRs();
+            }
+        }
+        
+        function clearAll() {
+            if (confirm('Delete ALL tickets? This cannot be undone.')) {
+                tickets = [];
+                saveTickets();
+                document.getElementById('qrSection').style.display = 'none';
+                updateStats();
+                renderTable();
+            }
+        }
+        
+        // Export
+        function exportData() {
+            const data = JSON.stringify(tickets, null, 2);
+            const area = document.getElementById('exportArea');
+            area.textContent = data;
+            area.style.display = 'block';
+            
+            // Also download as file
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `party-tickets-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Print
+        function printTickets() {
+            window.print();
+        }
+        
+        // Scanner
+        function initScanner() {
+            if (scanner) return;
+            
+            scanner = new Html5Qrcode('reader');
+            
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras.length === 0) {
+                    alert('No camera found');
+                    return;
+                }
+                
+                const camera = cameras.find(c => c.label.includes('back')) || cameras[0];
+                
+                scanner.start(
+                    camera.id,
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    (decodedText) => {
+                        handleScan(decodedText);
+                    },
+                    (error) => {
+                        // Ignore scan errors (no QR in frame)
+                    }
+                );
+            }).catch(err => {
+                console.error('Camera error:', err);
+                document.getElementById('reader').innerHTML = 
+                    '<p style="color: #ff4757; text-align: center; padding: 40px;">Camera access denied or unavailable. Please allow camera permissions.</p>';
+            });
+        }
+        
+        function handleScan(code) {
+            if (!scanner) return;
+            
+            // Pause scanning
+            scanner.pause();
+            
+            const ticket = tickets.find(t => t.code === code);
+            const result = document.getElementById('scanResult');
+            const icon = document.getElementById('scanIcon');
+            const title = document.getElementById('scanTitle');
+            const msg = document.getElementById('scanMessage');
+            const againBtn = document.getElementById('scanAgain');
+            
+            result.className = 'scan-result';
+            
+            if (!ticket) {
+                result.classList.add('invalid');
+                icon.textContent = '❌';
+                title.textContent = 'Invalid Ticket';
+                msg.textContent = 'This QR code is not recognized in the system.';
+            } else if (ticket.status === 'used') {
+                result.classList.add('used');
+                icon.textContent = '⚠️';
+                title.textContent = 'Already Used';
+                msg.textContent = `${ticket.name} - Checked in at ${ticket.usedAt}`;
+            } else {
+                result.classList.add('valid');
+                icon.textContent = '✅';
+                title.textContent = 'Welcome!';
+                msg.textContent = `${ticket.name} | ${ticket.type} | $${ticket.amount.toFixed(2)}`;
+                
+                // Auto mark as used
+                ticket.status = 'used';
+                ticket.usedAt = new Date().toLocaleString();
+                saveTickets();
+                updateStats();
+                renderTable();
+            }
+            
+            againBtn.style.display = 'inline-flex';
+        }
+        
+        function resetScanner() {
+            document.getElementById('scanResult').style.display = 'none';
+            document.getElementById('scanAgain').style.display = 'none';
+            if (scanner) {
+                scanner.resume();
+            }
+        }
+        
+        // Navigation
+        function showSection(name) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(name).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (name === 'scanner') {
+                initScanner();
+            } else if (scanner) {
+                scanner.stop().then(() => {
+                    scanner = null;
+                }).catch(() => {});
+            }
+        }
+        
+        // Utility
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Init
+        updateStats();
+        if (tickets.length > 0) {
+            document.getElementById('qrSection').style.display = 'block';
+            renderQRs();
+        }
+        renderTable();
+    </script>
+</body>
+</html>
