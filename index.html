@@ -258,7 +258,7 @@
                     <h2>Create New Ticket</h2>
                     <div class="form-group"><label>Guest Name</label><input type="text" id="guestName" placeholder="Enter guest name..." autocomplete="off"></div>
                     <div class="form-group"><label>Ticket Type</label><select id="ticketType"><option value="General">General Admission</option><option value="VIP">VIP Access</option><option value="Early">Early Bird</option><option value="Staff">Staff</option></select></div>
-                    <div class="form-group"><label>Amount Paid ($)</label><input type="number" id="amountPaid" placeholder="0.00" min="0" step="0.01"></div>
+                    <div class="form-group"><label>Amount Paid (₦)</label><input type="number" id="amountPaid" placeholder="0.00" min="0" step="0.01"></div>
                     <button class="btn btn-primary" onclick="generateTicket()">➕ Generate Ticket</button>
                 </div>
                 <div class="card no-print">
@@ -267,7 +267,7 @@
                         <div class="stat-box"><div class="number" id="statTotal">0</div><div class="label">Total Tickets</div></div>
                         <div class="stat-box"><div class="number" id="statValid">0</div><div class="label">Valid</div></div>
                         <div class="stat-box"><div class="number" id="statUsed">0</div><div class="label">Used</div></div>
-                        <div class="stat-box"><div class="number" id="statRevenue">$0</div><div class="label">Revenue</div></div>
+                        <div class="stat-box"><div class="number" id="statRevenue">₦0</div><div class="label">Revenue</div></div>
                     </div>
                     <div class="btn-row">
                         <button class="btn btn-secondary" onclick="printTickets()">🖨️ Print</button>
