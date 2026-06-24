@@ -7,7 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; -webkit-tap-highlight-color: transparent; }
@@ -48,17 +48,96 @@
         .qr-card .status-dot { position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; border-radius: 50%; background: #00d4aa; }
         .qr-card .status-dot.used { background: #ff4757; }
         .qr-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
-        .scanner-wrapper { position: relative; width: 100%; max-width: 500px; margin: 0 auto; border-radius: 20px; overflow: hidden; border: 3px solid #00d4aa; background: #000; box-shadow: 0 0 30px rgba(0, 212, 170, 0.3); }
-        #scanVideo { width: 100%; display: block; min-height: 300px; background: #000; }
-        .scanner-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; display: flex; align-items: center; justify-content: center; }
-        .scan-frame { width: 220px; height: 220px; border: 3px solid #00d4aa; border-radius: 20px; position: relative; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); }
-        .scan-frame::before, .scan-frame::after { content: ''; position: absolute; width: 30px; height: 30px; border: 4px solid #00d4aa; }
+
+        /* SCANNER - The key fix: video MUST be visible for iOS */
+        .scanner-box {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 3px solid #00d4aa;
+            background: #000;
+        }
+        #scanVideo {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #000;
+            /* CRITICAL: video must be visible for iOS Safari canvas capture */
+            opacity: 1;
+        }
+        #scanCanvas {
+            display: none; /* We process this in JS, don't show it */
+        }
+        .scan-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scan-frame {
+            width: 240px;
+            height: 240px;
+            border: 3px solid #00d4aa;
+            border-radius: 20px;
+            position: relative;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+        }
+        .scan-frame::before, .scan-frame::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 4px solid #00d4aa;
+        }
         .scan-frame::before { top: -4px; left: -4px; border-right: none; border-bottom: none; border-radius: 16px 0 0 0; }
         .scan-frame::after { bottom: -4px; right: -4px; border-left: none; border-top: none; border-radius: 0 0 16px 0; }
-        .scan-laser { position: absolute; top: 10%; left: 0; right: 0; height: 2px; background: #00d4aa; box-shadow: 0 0 10px #00d4aa, 0 0 20px #00d4aa; animation: scanMove 2.5s ease-in-out infinite; }
-        @keyframes scanMove { 0%, 100% { top: 10%; opacity: 0.5; } 50% { top: 90%; opacity: 1; } }
-        .scan-hint { position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; color: #fff; font-size: 0.9rem; text-shadow: 0 2px 4px rgba(0,0,0,0.8); pointer-events: none; }
-        .scan-result { margin-top: 16px; padding: 20px; border-radius: 16px; text-align: center; display: none; animation: popIn 0.3s; }
+        .scan-laser {
+            position: absolute;
+            top: 10%;
+            left: 5%;
+            right: 5%;
+            height: 2px;
+            background: #00d4aa;
+            box-shadow: 0 0 10px #00d4aa, 0 0 20px #00d4aa;
+            animation: scanMove 2s ease-in-out infinite;
+        }
+        @keyframes scanMove { 0%, 100% { top: 10%; opacity: 0.4; } 50% { top: 90%; opacity: 1; } }
+        .scan-hint {
+            position: absolute;
+            bottom: 15px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+            pointer-events: none;
+        }
+        .scan-status {
+            text-align: center;
+            padding: 12px;
+            color: #888;
+            font-size: 0.85rem;
+            min-height: 40px;
+        }
+        .scan-status.error { color: #ff4757; }
+        .scan-status.success { color: #00d4aa; }
+        .scan-status.warn { color: #ffa502; }
+
+        .scan-result {
+            margin-top: 16px;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            display: none;
+            animation: popIn 0.3s;
+        }
         @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .scan-result.show { display: block; }
         .scan-result.valid { background: rgba(0, 212, 170, 0.15); border: 2px solid #00d4aa; }
@@ -67,38 +146,90 @@
         .scan-icon { font-size: 3rem; margin-bottom: 10px; }
         .scan-result h3 { margin-bottom: 8px; font-size: 1.2rem; }
         .scan-result p { color: #ccc; font-size: 0.95rem; }
-        .scanner-controls { display: flex; gap: 10px; margin-top: 16px; justify-content: center; }
-        .scanner-controls button { padding: 12px 20px; border: 1px solid #2a2a4e; background: #1a1a2e; color: #fff; border-radius: 10px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
-        .scanner-controls button.active { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); color: #00d4aa; }
-        .photo-upload { margin-top: 16px; padding: 24px; border: 2px dashed #2a2a4e; border-radius: 16px; text-align: center; cursor: pointer; transition: all 0.3s; }
+
+        .scanner-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            justify-content: center;
+        }
+        .scanner-tabs button {
+            padding: 10px 18px;
+            border: 1px solid #2a2a4e;
+            background: #0f0f23;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .scanner-tabs button.active {
+            border-color: #00d4aa;
+            background: rgba(0, 212, 170, 0.1);
+            color: #00d4aa;
+        }
+
+        .photo-upload {
+            margin-top: 16px;
+            padding: 24px;
+            border: 2px dashed #2a2a4e;
+            border-radius: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
         .photo-upload:hover { border-color: #00d4aa; background: rgba(0, 212, 170, 0.05); }
         .photo-upload input { display: none; }
         .photo-upload-icon { font-size: 2.5rem; margin-bottom: 10px; }
+
         .manual-entry { margin-top: 16px; display: flex; gap: 8px; }
         .manual-entry input { flex: 1; text-transform: uppercase; font-family: monospace; }
-        .cam-status { text-align: center; padding: 12px; color: #888; font-size: 0.85rem; }
-        .cam-status.error { color: #ff4757; }
-        .cam-status.success { color: #00d4aa; }
+
         .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
         .stat-box { background: #0f0f23; padding: 16px; border-radius: 12px; text-align: center; border: 1px solid #2a2a4e; }
         .stat-box .number { font-size: 1.8rem; font-weight: 700; color: #00d4aa; }
         .stat-box .label { color: #888; font-size: 0.8rem; margin-top: 4px; }
+
         .ticket-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
         .ticket-table th, .ticket-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #2a2a4e; }
         .ticket-table th { color: #00d4aa; font-weight: 600; }
         .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
         .badge-valid { background: rgba(0, 212, 170, 0.2); color: #00d4aa; }
         .badge-used { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+
         .actions { display: flex; gap: 6px; }
         .actions button { padding: 5px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer; }
         .actions .btn-check { background: #00d4aa; color: #0f0f23; }
         .actions .btn-reset { background: #2a2a4e; color: #fff; }
         .actions .btn-del { background: #ff4757; color: #fff; }
+
         .hidden { display: none !important; }
-        .torch-btn { position: absolute; top: 15px; right: 15px; width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff; font-size: 1.2rem; cursor: pointer; z-index: 10; backdrop-filter: blur(4px); }
-        .torch-btn.on { background: rgba(255, 200, 0, 0.8); color: #000; }
-        @media print { body { background: #fff; color: #000; } .nav, .no-print, .sync-banner, .card:not(#qrSection) { display: none !important; } .section { display: block !important; } .qr-card { break-inside: avoid; border: 1px solid #ccc; page-break-inside: avoid; } #qrSection { display: block !important; } }
-        @media (max-width: 600px) { h1 { font-size: 1.2rem; } .qr-grid { grid-template-columns: 1fr 1fr; } .btn-row { flex-wrap: wrap; } .sync-banner { flex-direction: column; gap: 8px; text-align: center; } .scan-frame { width: 180px; height: 180px; } }
+
+        .debug-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #0f0f23;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #666;
+            text-align: center;
+        }
+
+        @media print {
+            body { background: #fff; color: #000; }
+            .nav, .no-print, .sync-banner, .card:not(#qrSection) { display: none !important; }
+            .section { display: block !important; }
+            .qr-card { break-inside: avoid; border: 1px solid #ccc; page-break-inside: avoid; }
+            #qrSection { display: block !important; }
+        }
+        @media (max-width: 600px) {
+            h1 { font-size: 1.2rem; }
+            .qr-grid { grid-template-columns: 1fr 1fr; }
+            .btn-row { flex-wrap: wrap; }
+            .sync-banner { flex-direction: column; gap: 8px; text-align: center; }
+            .scan-frame { width: 200px; height: 200px; }
+        }
     </style>
 <base target="_blank">
 </head>
@@ -106,6 +237,7 @@
     <div class="container">
         <h1>🎉 Party Ticket System</h1>
         <p class="subtitle">Cloud-Synced QR Tickets with Live Scanner</p>
+
         <div class="sync-banner" id="syncBanner">
             <div class="sync-status">
                 <div class="sync-dot" id="syncDot"></div>
@@ -113,12 +245,14 @@
             </div>
             <span id="deviceId" style="font-family:monospace; color:#888; font-size:0.75rem;"></span>
         </div>
+
         <div id="mainApp">
             <div class="nav">
                 <button class="nav-btn active" onclick="showSection('generator')">🎫 Generate</button>
                 <button class="nav-btn" onclick="showSection('scanner')">📷 Scan</button>
                 <button class="nav-btn" onclick="showSection('manage')">📋 Manage</button>
             </div>
+
             <div id="generator" class="section active">
                 <div class="card">
                     <h2>Create New Ticket</h2>
@@ -146,40 +280,66 @@
                     <div id="qrContainer" class="qr-grid"></div>
                 </div>
             </div>
+
             <div id="scanner" class="section">
                 <div class="card">
                     <h2>🔥 Live Ticket Scanner</h2>
-                    <div class="scanner-controls">
-                        <button id="btnLive" class="active" onclick="setScanMode('live')">📷 Live Camera</button>
-                        <button id="btnPhoto" onclick="setScanMode('photo')">📸 Photo</button>
-                        <button id="btnType" onclick="setScanMode('type')">⌨️ Type Code</button>
+
+                    <div class="scanner-tabs">
+                        <button id="tabLive" class="active" onclick="switchScanMode('live')">📷 Live Camera</button>
+                        <button id="tabPhoto" onclick="switchScanMode('photo')">📸 Photo</button>
+                        <button id="tabType" onclick="switchScanMode('type')">⌨️ Type Code</button>
                     </div>
-                    <div id="liveScanner">
-                        <div class="scanner-wrapper" id="scannerWrapper">
-                            <video id="scanVideo" autoplay muted playsinline></video>
-                            <button class="torch-btn" id="torchBtn" onclick="toggleTorch()">🔦</button>
-                            <div class="scanner-overlay"><div class="scan-frame"><div class="scan-laser"></div></div></div>
-                            <div class="scan-hint">Point at QR code</div>
+
+                    <!-- LIVE CAMERA -->
+                    <div id="liveView">
+                        <div class="scanner-box">
+                            <!-- Video MUST be visible in DOM for iOS Safari -->
+                            <video id="scanVideo" autoplay playsinline muted></video>
+                            <canvas id="scanCanvas"></canvas>
+                            <div class="scan-overlay">
+                                <div class="scan-frame">
+                                    <div class="scan-laser"></div>
+                                </div>
+                            </div>
+                            <div class="scan-hint">Point QR code here</div>
                         </div>
-                        <div class="cam-status" id="camStatus">Starting camera...</div>
-                        <div style="text-align:center; margin-top:10px;"><button class="btn btn-secondary" onclick="restartCamera()" style="width:auto; padding:10px 20px; font-size:0.85rem;">🔄 Restart Camera</button></div>
+                        <div class="scan-status" id="scanStatus">Tap "Start Camera" below</div>
+                        <div style="text-align:center; margin-top:12px;">
+                            <button class="btn btn-primary" id="startCamBtn" onclick="startCamera()" style="width:auto; padding:12px 30px;">▶️ Start Camera</button>
+                            <button class="btn btn-secondary hidden" id="stopCamBtn" onclick="stopCamera()" style="width:auto; padding:12px 30px;">⏹️ Stop</button>
+                        </div>
+                        <div class="debug-info" id="debugInfo"></div>
                     </div>
-                    <div id="photoScanner" class="hidden">
+
+                    <!-- PHOTO -->
+                    <div id="photoView" class="hidden">
                         <label class="photo-upload">
                             <input type="file" id="qrPhoto" accept="image/*" capture="environment" onchange="scanPhoto(this)">
                             <div class="photo-upload-icon">📸</div>
                             <div style="color:#fff; font-weight:600; font-size:1.1rem;">Tap to Take Photo</div>
-                            <div style="color:#888; margin-top:6px;">Uses your phone's native camera app</div>
+                            <div style="color:#888; margin-top:6px;">Opens your phone's camera app</div>
                         </label>
                     </div>
-                    <div id="typeScanner" class="hidden">
-                        <div class="manual-entry"><input type="text" id="manualCode" placeholder="PT-ABC12345" maxlength="12"><button class="btn btn-primary" onclick="verifyManual()" style="width:auto; margin:0;">Verify</button></div>
-                        <p style="color:#888; text-align:center; margin-top:10px; font-size:0.85rem;">Type the code printed below the QR code</p>
+
+                    <!-- MANUAL -->
+                    <div id="typeView" class="hidden">
+                        <div class="manual-entry">
+                            <input type="text" id="manualCode" placeholder="PT-ABC12345" maxlength="12">
+                            <button class="btn btn-primary" onclick="verifyManual()" style="width:auto; margin:0;">Verify</button>
+                        </div>
+                        <p style="color:#888; text-align:center; margin-top:10px; font-size:0.85rem;">Type the code printed below each QR</p>
                     </div>
-                    <div id="scanResult" class="scan-result"><div class="scan-icon" id="scanIcon">✅</div><h3 id="scanTitle">Valid Ticket</h3><p id="scanMessage">Welcome to the party!</p></div>
+
+                    <div id="scanResult" class="scan-result">
+                        <div class="scan-icon" id="scanIcon">✅</div>
+                        <h3 id="scanTitle">Valid Ticket</h3>
+                        <p id="scanMessage">Welcome to the party!</p>
+                    </div>
                     <button class="btn btn-secondary no-print" onclick="resetScan()" id="scanAgain" style="display:none;">🔄 Scan Another</button>
                 </div>
             </div>
+
             <div id="manage" class="section">
                 <div class="card">
                     <h2>All Tickets</h2>
@@ -194,10 +354,18 @@
             </div>
         </div>
     </div>
+
     <script>
-        let db = null, tickets = [], currentStream = null, codeReader = null, scanMode = 'live';
+        // ========== CONFIG ==========
+        let db = null;
+        let tickets = [];
+        let currentStream = null;
+        let isScanning = false;
+        let scanMode = 'live';
+        let rafId = null;
         const deviceId = 'D-' + Math.random().toString(36).substr(2, 6).toUpperCase();
         document.getElementById('deviceId').textContent = deviceId;
+
         const savedUrl = 'https://party-tickets-b5223-default-rtdb.firebaseio.com/';
         initFirebase(savedUrl);
 
@@ -218,11 +386,14 @@
                 updateUI();
             }
         }
+
         function saveToCloud() {
             if (!db) { localStorage.setItem('partyTickets', JSON.stringify(tickets)); return; }
             const obj = {}; tickets.forEach(t => { obj[t.id] = t; }); db.ref('tickets').set(obj);
         }
+
         function updateUI() { updateStats(); renderQRs(); renderTable(); if (tickets.length > 0) document.getElementById('qrSection').style.display = 'block'; }
+
         function generateTicket() {
             const name = document.getElementById('guestName').value.trim(), type = document.getElementById('ticketType').value, amount = parseFloat(document.getElementById('amountPaid').value) || 0;
             if (!name) { alert('Please enter a guest name'); return; }
@@ -230,7 +401,9 @@
             tickets.push(ticket); saveToCloud();
             document.getElementById('guestName').value = ''; document.getElementById('amountPaid').value = ''; document.getElementById('qrSection').style.display = 'block';
         }
+
         function generateCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let code = ''; for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)]; return 'PT-' + code; }
+
         function renderQRs() {
             const container = document.getElementById('qrContainer'); container.innerHTML = '';
             tickets.forEach(t => {
@@ -240,107 +413,211 @@
                 setTimeout(() => { const el = document.getElementById(`qr-${t.id}`); if (el) new QRCode(el, { text: t.code, width: 120, height: 120, colorDark: t.status === 'used' ? '#ff4757' : '#00d4aa', colorLight: '#0f0f23', correctLevel: QRCode.CorrectLevel.H }); }, 10);
             });
         }
-        function updateStats() { document.getElementById('statTotal').textContent = tickets.length; document.getElementById('statValid').textContent = tickets.filter(t => t.status === 'valid').length; document.getElementById('statUsed').textContent = tickets.filter(t => t.status === 'used').length; document.getElementById('statRevenue').textContent = '$' + tickets.reduce((sum, t) => sum + t.amount, 0).toFixed(2); }
 
-        function setScanMode(mode) {
-            scanMode = mode;
-            document.getElementById('btnLive').classList.toggle('active', mode === 'live');
-            document.getElementById('btnPhoto').classList.toggle('active', mode === 'photo');
-            document.getElementById('btnType').classList.toggle('active', mode === 'type');
-            document.getElementById('liveScanner').classList.toggle('hidden', mode !== 'live');
-            document.getElementById('photoScanner').classList.toggle('hidden', mode !== 'photo');
-            document.getElementById('typeScanner').classList.toggle('hidden', mode !== 'type');
-            if (mode === 'live') startLiveScanner(); else stopCamera();
+        function updateStats() {
+            document.getElementById('statTotal').textContent = tickets.length;
+            document.getElementById('statValid').textContent = tickets.filter(t => t.status === 'valid').length;
+            document.getElementById('statUsed').textContent = tickets.filter(t => t.status === 'used').length;
+            document.getElementById('statRevenue').textContent = '$' + tickets.reduce((sum, t) => sum + t.amount, 0).toFixed(2);
         }
 
-        async function startLiveScanner() {
+        // ========== SCANNER MODES ==========
+        function switchScanMode(mode) {
+            scanMode = mode;
+            document.getElementById('tabLive').classList.toggle('active', mode === 'live');
+            document.getElementById('tabPhoto').classList.toggle('active', mode === 'photo');
+            document.getElementById('tabType').classList.toggle('active', mode === 'type');
+            document.getElementById('liveView').classList.toggle('hidden', mode !== 'live');
+            document.getElementById('photoView').classList.toggle('hidden', mode !== 'photo');
+            document.getElementById('typeView').classList.toggle('hidden', mode !== 'type');
+            if (mode !== 'live') stopCamera();
+        }
+
+        // ========== LIVE CAMERA SCANNER ==========
+        async function startCamera() {
             const video = document.getElementById('scanVideo');
-            const status = document.getElementById('camStatus');
-            video.srcObject = null; stopCamera();
+            const canvas = document.getElementById('scanCanvas');
+            const status = document.getElementById('scanStatus');
+            const debug = document.getElementById('debugInfo');
+
+            // Check HTTPS
             if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-                status.textContent = '⚠️ Camera requires HTTPS. Use Photo or Type Code instead.';
-                status.className = 'cam-status error'; return;
+                status.textContent = '❌ Camera requires HTTPS. Use Photo or Type Code.';
+                status.className = 'scan-status error';
+                return;
             }
-            status.textContent = 'Starting camera...'; status.className = 'cam-status';
+
+            // Check getUserMedia support
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                status.textContent = '❌ Camera API not supported. Use Photo or Type Code.';
+                status.className = 'scan-status error';
+                return;
+            }
+
+            status.textContent = '📷 Requesting camera...';
+            status.className = 'scan-status';
+
             try {
-                if (typeof ZXing !== 'undefined') {
-                    codeReader = new ZXing.BrowserQRCodeReader();
-                    await codeReader.decodeFromVideoDevice(undefined, 'scanVideo', (result, err) => {
-                        if (result) { handleScan(result.getText()); stopCamera(); }
-                    });
-                    status.textContent = '✅ Camera active — point at QR code'; status.className = 'cam-status success';
-                } else { await startNativeCamera(video, status); }
+                // Stop any existing stream
+                stopCamera();
+
+                // Request camera with environment facing
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                video.srcObject = stream;
+
+                // CRITICAL: iOS Safari needs these attributes
+                video.setAttribute('playsinline', 'true');
+                video.setAttribute('muted', 'true');
+                video.setAttribute('autoplay', 'true');
+
+                // Wait for video to be ready
+                await new Promise((resolve, reject) => {
+                    video.onloadedmetadata = () => {
+                        video.play().then(resolve).catch(reject);
+                    };
+                    video.onerror = reject;
+                    setTimeout(() => reject(new Error('Video load timeout')), 10000);
+                });
+
+                status.textContent = '✅ Camera active! Point at QR code';
+                status.className = 'scan-status success';
+                document.getElementById('startCamBtn').classList.add('hidden');
+                document.getElementById('stopCamBtn').classList.remove('hidden');
+
+                // Start scanning loop
+                isScanning = true;
+                scanLoop(video, canvas, status, debug);
+
             } catch (err) {
                 console.error('Camera error:', err);
-                status.textContent = '❌ Camera failed: ' + err.message + '. Try Photo or Type Code.'; status.className = 'cam-status error';
+                let msg = err.name === 'NotAllowedError' ? 'Camera permission denied. Check browser settings.' :
+                          err.name === 'NotFoundError' ? 'No camera found on this device.' :
+                          err.name === 'NotReadableError' ? 'Camera is in use by another app.' :
+                          'Camera failed: ' + err.message;
+                status.textContent = '❌ ' + msg;
+                status.className = 'scan-status error';
+                debug.textContent = 'Error: ' + err.name + ' | ' + err.message;
             }
         }
 
-        async function startNativeCamera(video, status) {
-            const constraints = { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            currentStream = stream; video.srcObject = stream;
-            await new Promise((resolve) => { video.onloadedmetadata = () => { video.play(); resolve(); }; });
-            status.textContent = '✅ Camera active — point at QR code'; status.className = 'cam-status success';
-            scanFrameLoop(video);
-        }
+        function scanLoop(video, canvas, status, debug) {
+            if (!isScanning || !currentStream) return;
 
-        function scanFrameLoop(video) {
-            if (!currentStream || video.paused || video.ended) return;
-            if ('BarcodeDetector' in window) {
-                const detector = new BarcodeDetector({ formats: ['qr_code'] });
-                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-                const scan = async () => {
-                    if (!currentStream || video.paused || video.ended) return;
-                    try { canvas.width = video.videoWidth; canvas.height = video.videoHeight; ctx.drawImage(video, 0, 0, canvas.width, canvas.height); const barcodes = await detector.detect(canvas); if (barcodes.length > 0) { handleScan(barcodes[0].rawValue); stopCamera(); return; } } catch (e) {}
-                    requestAnimationFrame(scan);
-                }; scan();
-            } else { status.textContent = 'Camera active. If QR not detected, use Photo mode.'; }
+            // Only process if video has data
+            if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+                // Set canvas size to match video (but limit for performance)
+                const maxDim = 640;
+                let w = video.videoWidth;
+                let h = video.videoHeight;
+                if (w > maxDim || h > maxDim) {
+                    const ratio = Math.min(maxDim / w, maxDim / h);
+                    w = Math.floor(w * ratio);
+                    h = Math.floor(h * ratio);
+                }
+                canvas.width = w;
+                canvas.height = h;
+
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(video, 0, 0, w, h);
+
+                // Try to detect QR code
+                try {
+                    const imageData = ctx.getImageData(0, 0, w, h);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: 'attemptBoth'
+                    });
+
+                    if (code && code.data) {
+                        // Found a code!
+                        handleScan(code.data);
+                        stopCamera();
+                        return;
+                    }
+                } catch (e) {
+                    // jsQR error, continue scanning
+                }
+
+                // Update debug info occasionally
+                if (Math.random() < 0.05) {
+                    debug.textContent = `Scanning... ${w}x${h} | ReadyState: ${video.readyState}`;
+                }
+            }
+
+            rafId = requestAnimationFrame(() => scanLoop(video, canvas, status, debug));
         }
 
         function stopCamera() {
-            if (codeReader) { codeReader.reset(); codeReader = null; }
-            if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); currentStream = null; }
-            document.getElementById('scanVideo').srcObject = null;
+            isScanning = false;
+            if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            const video = document.getElementById('scanVideo');
+            video.srcObject = null;
+            video.pause();
+            document.getElementById('startCamBtn').classList.remove('hidden');
+            document.getElementById('stopCamBtn').classList.add('hidden');
+            document.getElementById('scanStatus').textContent = 'Camera stopped';
+            document.getElementById('scanStatus').className = 'scan-status';
         }
 
-        async function toggleTorch() {
-            if (!currentStream) return;
-            const track = currentStream.getVideoTracks()[0];
-            try { const capabilities = track.getCapabilities(); if (capabilities.torch) { const settings = track.getSettings(); const torchOn = !settings.torch; await track.applyConstraints({ advanced: [{ torch: torchOn }] }); document.getElementById('torchBtn').classList.toggle('on', torchOn); } } catch (e) {}
-        }
-
-        function restartCamera() { stopCamera(); setTimeout(() => startLiveScanner(), 300); }
-
+        // ========== PHOTO SCAN ==========
         async function scanPhoto(input) {
             if (!input.files || !input.files[0]) return;
             try {
-                if (typeof ZXing !== 'undefined') {
-                    const reader = new ZXing.BrowserQRCodeReader();
-                    const result = await reader.decodeFromImageUrl(URL.createObjectURL(input.files[0]));
-                    handleScan(result.getText());
-                } else {
-                    const img = await createImageBitmap(input.files[0]);
-                    if ('BarcodeDetector' in window) { const detector = new BarcodeDetector({ formats: ['qr_code'] }); const barcodes = await detector.detect(img); if (barcodes.length > 0) handleScan(barcodes[0].rawValue); else throw new Error('No QR found'); }
-                    else throw new Error('No QR scanner available');
-                }
-            } catch (err) { showResult('invalid', '❌', 'No QR Found', 'Could not read QR. Try again or type the code.'); }
+                const img = await createImageBitmap(input.files[0]);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+                if (code && code.data) handleScan(code.data);
+                else throw new Error('No QR found');
+            } catch (err) {
+                showResult('invalid', '❌', 'No QR Found', 'Could not read QR from photo. Try again.');
+            }
             input.value = '';
         }
 
+        // ========== MANUAL ==========
         function verifyManual() {
             const code = document.getElementById('manualCode').value.trim().toUpperCase();
-            if (!code) return; handleScan(code); document.getElementById('manualCode').value = '';
+            if (!code) return;
+            handleScan(code);
+            document.getElementById('manualCode').value = '';
         }
 
+        // ========== HANDLE SCAN RESULT ==========
         function handleScan(code) {
             stopCamera();
             const ticket = tickets.find(t => t.code === code);
             const result = document.getElementById('scanResult');
             result.className = 'scan-result show';
-            if (!ticket) { showResult('invalid', '❌', 'Invalid Ticket', 'Code not found: ' + code); }
-            else if (ticket.status === 'used') { showResult('used', '⚠️', 'Already Used', `${ticket.name} — checked in at ${ticket.usedAt}`); }
-            else { showResult('valid', '✅', 'Welcome!', `${ticket.name} | ${ticket.type} | $${ticket.amount.toFixed(2)}`); ticket.status = 'used'; ticket.usedAt = new Date().toLocaleString(); ticket.checkedInBy = deviceId; saveToCloud(); }
+
+            if (!ticket) {
+                showResult('invalid', '❌', 'Invalid Ticket', 'Code not found: ' + code);
+            } else if (ticket.status === 'used') {
+                showResult('used', '⚠️', 'Already Used', `${ticket.name} — checked in at ${ticket.usedAt}`);
+            } else {
+                showResult('valid', '✅', 'Welcome!', `${ticket.name} | ${ticket.type} | $${ticket.amount.toFixed(2)}`);
+                ticket.status = 'used';
+                ticket.usedAt = new Date().toLocaleString();
+                ticket.checkedInBy = deviceId;
+                saveToCloud();
+            }
             document.getElementById('scanAgain').style.display = 'block';
         }
 
@@ -354,9 +631,14 @@
         function resetScan() {
             document.getElementById('scanResult').className = 'scan-result';
             document.getElementById('scanAgain').style.display = 'none';
-            if (scanMode === 'live') startLiveScanner();
+            document.getElementById('debugInfo').textContent = '';
+            if (scanMode === 'live') {
+                document.getElementById('scanStatus').textContent = 'Tap "Start Camera" to begin';
+                document.getElementById('scanStatus').className = 'scan-status';
+            }
         }
 
+        // ========== MANAGE ==========
         function renderTable() {
             const tbody = document.getElementById('ticketTableBody');
             const search = document.getElementById('searchTickets').value.toLowerCase();
@@ -376,7 +658,8 @@
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(name).classList.add('active');
             event.target.classList.add('active');
-            if (name === 'scanner') setScanMode('live'); else { stopCamera(); resetScan(); }
+            if (name === 'scanner') { switchScanMode('live'); resetScan(); }
+            else { stopCamera(); }
         }
 
         function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
