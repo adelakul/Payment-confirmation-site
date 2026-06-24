@@ -14,7 +14,7 @@
         .container { max-width: 900px; margin: 0 auto; padding: 16px; }
         h1 { text-align: center; color: #00d4aa; margin-bottom: 6px; font-size: 1.5rem; }
         .subtitle { text-align: center; color: #888; margin-bottom: 20px; font-size: 0.85rem; }
-        .sync-banner { background: #1a1a2e; border: 1px solid #00d4aa; border-radius: 10px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; }
+        .sync-banner { background: #1a1a2e; border: 1px solid #00d4aa; border-radius: 10px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
         .sync-status { display: flex; align-items: center; gap: 8px; }
         .sync-dot { width: 10px; height: 10px; border-radius: 50%; background: #ff4757; animation: pulse 1.5s infinite; }
         .sync-dot.online { background: #00d4aa; animation: none; }
@@ -31,7 +31,7 @@
         label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.85rem; }
         input, select { width: 100%; padding: 12px 14px; border: 1px solid #2a2a4e; background: #0f0f23; color: #fff; border-radius: 8px; font-size: 1rem; outline: none; -webkit-appearance: none; }
         input:focus, select:focus { border-color: #00d4aa; }
-        .btn { padding: 14px 24px; border: none; border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-bottom: 8px; }
+        .btn { padding: 14px 24px; border: none; border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-primary { background: #00d4aa; color: #0f0f23; }
         .btn-primary:hover { background: #00f5c4; }
         .btn-danger { background: #ff4757; color: #fff; }
@@ -257,7 +257,7 @@
                 <div class="card">
                     <h2>Create New Ticket</h2>
                     <div class="form-group"><label>Guest Name</label><input type="text" id="guestName" placeholder="Enter guest name..." autocomplete="off"></div>
-                    <div class="form-group"><label>Ticket Type</label><select id="ticketType"><option value="General">General Admission</option><option value="VIP">VIP Access</option><option value="Early">Early Bird</option><option value="Staff">Staff</option></select></div>
+                    <div class="form-group"><label>Ticket Type</label><select id="ticketType"><option value="General">General Admission</option><option value="VIP">VIP Access</option><option value="Early Bird">Early Bird</option></select></div>
                     <div class="form-group"><label>Amount Paid (₦)</label><input type="number" id="amountPaid" placeholder="0.00" min="0" step="0.01"></div>
                     <button class="btn btn-primary" onclick="generateTicket()">➕ Generate Ticket</button>
                 </div>
@@ -346,7 +346,7 @@
                     <div class="form-group"><input type="text" id="searchTickets" placeholder="🔍 Search by name or code..." oninput="renderTable()"></div>
                     <div style="overflow-x: auto;">
                         <table class="ticket-table">
-                            <thead><tr><th>Status</th><th>Name</th><th>Type</th><th>$</th><th>Code</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>Status</th><th>Name</th><th>Type</th><th>₦</th><th>Code</th><th>Actions</th></tr></thead>
                             <tbody id="ticketTableBody"></tbody>
                         </table>
                     </div>
@@ -408,9 +408,9 @@
             const container = document.getElementById('qrContainer'); container.innerHTML = '';
             tickets.forEach(t => {
                 const card = document.createElement('div'); card.className = 'qr-card';
-                card.innerHTML = `<div class="status-dot ${t.status === 'used' ? 'used' : ''}"></div><div class="name">${escapeHtml(t.name)}</div><div class="type">${t.type}</div><div class="code">${t.code}</div><div class="qr-wrap" id="qr-${t.id}"></div><div style="font-size:0.7rem; color:#666;">${t.status === 'used' ? '✓ ' + t.usedAt : 'Valid'}</div>`;
+                card.innerHTML = `<div class="status-dot ${t.status === 'used' ? 'used' : ''}"></div><div class="name">${escapeHtml(t.name)}</div><div class="type">${t.type}</div><div class="code">${t.code}</div><div id="qr-${t.id}"></div>`;
                 container.appendChild(card);
-                setTimeout(() => { const el = document.getElementById(`qr-${t.id}`); if (el) new QRCode(el, { text: t.code, width: 120, height: 120, colorDark: t.status === 'used' ? '#ff4757' : '#00d4aa', colorLight: '#0f0f23', correctLevel: QRCode.CorrectLevel.H }); }, 10);
+                setTimeout(() => { const el = document.getElementById(`qr-${t.id}`); if (el) new QRCode(el, { text: t.code, width: 120, height: 120, colorDark: t.status === 'used' ? '#ff4757' : '#00d4aa', colorLight: '#0f0f23' }); }, 100);
             });
         }
 
@@ -418,7 +418,7 @@
             document.getElementById('statTotal').textContent = tickets.length;
             document.getElementById('statValid').textContent = tickets.filter(t => t.status === 'valid').length;
             document.getElementById('statUsed').textContent = tickets.filter(t => t.status === 'used').length;
-            document.getElementById('statRevenue').textContent = '$' + tickets.reduce((sum, t) => sum + t.amount, 0).toFixed(2);
+            document.getElementById('statRevenue').textContent = '₦' + tickets.reduce((sum, t) => sum + t.amount, 0).toFixed(2);
         }
 
         // ========== SCANNER MODES ==========
@@ -612,7 +612,7 @@
             } else if (ticket.status === 'used') {
                 showResult('used', '⚠️', 'Already Used', `${ticket.name} — checked in at ${ticket.usedAt}`);
             } else {
-                showResult('valid', '✅', 'Welcome!', `${ticket.name} | ${ticket.type} | $${ticket.amount.toFixed(2)}`);
+                showResult('valid', '✅', 'Welcome!', `${ticket.name} | ${ticket.type} | ₦${ticket.amount.toFixed(2)}`);
                 ticket.status = 'used';
                 ticket.usedAt = new Date().toLocaleString();
                 ticket.checkedInBy = deviceId;
@@ -643,14 +643,14 @@
             const tbody = document.getElementById('ticketTableBody');
             const search = document.getElementById('searchTickets').value.toLowerCase();
             let filtered = search ? tickets.filter(t => t.name.toLowerCase().includes(search) || t.code.toLowerCase().includes(search)) : tickets;
-            tbody.innerHTML = filtered.map(t => `<tr><td><span class="badge badge-${t.status}">${t.status}</span></td><td>${escapeHtml(t.name)}</td><td>${t.type}</td><td>$${t.amount.toFixed(2)}</td><td><code>${t.code}</code></td><td><div class="actions">${t.status === 'valid' ? `<button class="btn-check" onclick="markUsed(${t.id})">Check In</button>` : `<button class="btn-reset" onclick="markValid(${t.id})">Reset</button>`}<button class="btn-del" onclick="deleteTicket(${t.id})">Del</button></div></td></tr>`).join('');
+            tbody.innerHTML = filtered.map(t => `<tr><td><span class="badge badge-${t.status}">${t.status}</span></td><td>${escapeHtml(t.name)}</td><td>${t.type}</td><td>₦${t.amount.toFixed(2)}</td><td>${t.code}</td><td><div class="actions"><button class="btn-check" onclick="markUsed(${t.id})">✅</button><button class="btn-reset" onclick="markValid(${t.id})">↩️</button><button class="btn-del" onclick="deleteTicket(${t.id})">🗑️</button></div></td></tr>`).join('');
         }
 
         function markUsed(id) { const t = tickets.find(x => x.id === id); if (t) { t.status = 'used'; t.usedAt = new Date().toLocaleString(); t.checkedInBy = deviceId; saveToCloud(); } }
         function markValid(id) { const t = tickets.find(x => x.id === id); if (t) { t.status = 'valid'; t.usedAt = null; saveToCloud(); } }
         function deleteTicket(id) { if (confirm('Delete this ticket?')) { tickets = tickets.filter(t => t.id !== id); saveToCloud(); if (tickets.length === 0) document.getElementById('qrSection').style.display = 'none'; } }
         function clearAll() { if (confirm('Delete ALL tickets?')) { tickets = []; saveToCloud(); document.getElementById('qrSection').style.display = 'none'; } }
-        function exportData() { const data = JSON.stringify(tickets, null, 2); const blob = new Blob([data], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `party-tickets-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url); }
+        function exportData() { const data = JSON.stringify(tickets, null, 2); const blob = new Blob([data], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tickets.json'; a.click(); URL.revokeObjectURL(url); }
         function printTickets() { window.print(); }
 
         function showSection(name) {
