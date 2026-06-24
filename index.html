@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Party Ticket System</title>
+    <title>Party Ticket System - Cloud Sync</title>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+    <!-- QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
     <style>
@@ -16,10 +20,30 @@
             -webkit-tap-highlight-color: transparent;
         }
         .container { max-width: 900px; margin: 0 auto; padding: 16px; }
-        h1 { text-align: center; color: #00d4aa; margin-bottom: 6px; font-size: 1.6rem; }
-        .subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 0.9rem; }
-        
-        /* Nav */
+        h1 { text-align: center; color: #00d4aa; margin-bottom: 6px; font-size: 1.5rem; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 20px; font-size: 0.85rem; }
+
+        .sync-banner {
+            background: #1a1a2e;
+            border: 1px solid #00d4aa;
+            border-radius: 10px;
+            padding: 10px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+        .sync-status { display: flex; align-items: center; gap: 8px; }
+        .sync-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #ff4757;
+            animation: pulse 1.5s infinite;
+        }
+        .sync-dot.online { background: #00d4aa; animation: none; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
         .nav {
             display: flex;
             gap: 6px;
@@ -41,17 +65,13 @@
             transition: all 0.3s;
             font-weight: 600;
             white-space: nowrap;
-            min-width: 0;
         }
-        .nav-btn.active {
-            background: #00d4aa;
-            color: #0f0f23;
-        }
-        
+        .nav-btn.active { background: #00d4aa; color: #0f0f23; }
+
         .section { display: none; animation: fadeIn 0.3s; }
         .section.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
+
         .card {
             background: #1a1a2e;
             border-radius: 16px;
@@ -60,7 +80,7 @@
             border: 1px solid #2a2a4e;
         }
         .card h2 { color: #00d4aa; margin-bottom: 14px; font-size: 1.2rem; }
-        
+
         .form-group { margin-bottom: 14px; }
         label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.85rem; }
         input, select {
@@ -75,6 +95,7 @@
             -webkit-appearance: none;
         }
         input:focus, select:focus { border-color: #00d4aa; }
+
         .btn {
             padding: 14px 24px;
             border: none;
@@ -90,10 +111,7 @@
             width: 100%;
             margin-bottom: 8px;
         }
-        .btn-primary {
-            background: #00d4aa;
-            color: #0f0f23;
-        }
+        .btn-primary { background: #00d4aa; color: #0f0f23; }
         .btn-primary:hover { background: #00f5c4; }
         .btn-danger { background: #ff4757; color: #fff; }
         .btn-danger:hover { background: #ff6b81; }
@@ -101,8 +119,7 @@
         .btn-secondary:hover { background: #3a3a6e; }
         .btn-row { display: flex; gap: 8px; margin-top: 12px; }
         .btn-row .btn { width: auto; flex: 1; font-size: 0.85rem; padding: 10px; }
-        
-        /* QR Display */
+
         .qr-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -123,17 +140,14 @@
         .qr-card .code { font-family: monospace; color: #888; font-size: 0.7rem; margin-bottom: 10px; }
         .qr-card .status-dot {
             position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 10px;
-            height: 10px;
+            top: 8px; right: 8px;
+            width: 10px; height: 10px;
             border-radius: 50%;
             background: #00d4aa;
         }
         .qr-card .status-dot.used { background: #ff4757; }
         .qr-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
-        
-        /* Scanner */
+
         .scanner-container {
             position: relative;
             width: 100%;
@@ -144,11 +158,7 @@
             border: 2px solid #2a2a4e;
             background: #0f0f23;
         }
-        #scanVideo {
-            width: 100%;
-            display: block;
-            border-radius: 16px;
-        }
+        #scanVideo { width: 100%; display: block; border-radius: 16px; }
         .scanner-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -158,36 +168,28 @@
             justify-content: center;
         }
         .scan-frame {
-            width: 200px;
-            height: 200px;
+            width: 200px; height: 200px;
             border: 2px solid #00d4aa;
             border-radius: 16px;
             position: relative;
         }
         .scan-frame::before, .scan-frame::after {
-            content: '';
-            position: absolute;
+            content: ''; position: absolute;
             width: 20px; height: 20px;
             border: 3px solid #00d4aa;
         }
         .scan-frame::before { top: -3px; left: -3px; border-right: none; border-bottom: none; }
         .scan-frame::after { bottom: -3px; right: -3px; border-left: none; border-top: none; }
-        
         .scan-laser {
             position: absolute;
-            top: 50%;
-            left: 10%;
-            right: 10%;
+            top: 50%; left: 10%; right: 10%;
             height: 2px;
             background: #00d4aa;
             box-shadow: 0 0 8px #00d4aa;
             animation: scan 2s ease-in-out infinite;
         }
-        @keyframes scan {
-            0%, 100% { top: 20%; opacity: 0.3; }
-            50% { top: 80%; opacity: 1; }
-        }
-        
+        @keyframes scan { 0%, 100% { top: 20%; opacity: 0.3; } 50% { top: 80%; opacity: 1; } }
+
         .scan-result {
             margin-top: 16px;
             padding: 16px;
@@ -202,8 +204,7 @@
         .scan-icon { font-size: 2.5rem; margin-bottom: 8px; }
         .scan-result h3 { margin-bottom: 6px; font-size: 1.1rem; }
         .scan-result p { color: #aaa; font-size: 0.9rem; }
-        
-        /* File upload fallback */
+
         .file-upload {
             margin-top: 16px;
             padding: 20px;
@@ -216,20 +217,27 @@
         .file-upload:hover { border-color: #00d4aa; background: rgba(0, 212, 170, 0.05); }
         .file-upload input { display: none; }
         .file-upload-icon { font-size: 2rem; margin-bottom: 8px; }
-        
-        /* Manual entry */
-        .manual-entry {
-            margin-top: 16px;
+
+        .manual-entry { margin-top: 16px; display: flex; gap: 8px; }
+        .manual-entry input { flex: 1; text-transform: uppercase; font-family: monospace; }
+
+        .cam-toggle {
             display: flex;
             gap: 8px;
+            margin-bottom: 12px;
+            justify-content: center;
         }
-        .manual-entry input {
-            flex: 1;
-            text-transform: uppercase;
-            font-family: monospace;
+        .cam-toggle button {
+            padding: 8px 16px;
+            border: 1px solid #2a2a4e;
+            background: #0f0f23;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
         }
-        
-        /* Stats */
+        .cam-toggle button.active { border-color: #00d4aa; color: #00d4aa; }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -245,8 +253,7 @@
         }
         .stat-box .number { font-size: 1.8rem; font-weight: 700; color: #00d4aa; }
         .stat-box .label { color: #888; font-size: 0.8rem; margin-top: 4px; }
-        
-        /* Table */
+
         .ticket-table {
             width: 100%;
             border-collapse: collapse;
@@ -267,234 +274,238 @@
         }
         .badge-valid { background: rgba(0, 212, 170, 0.2); color: #00d4aa; }
         .badge-used { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
-        
+
         .actions { display: flex; gap: 6px; }
         .actions button { padding: 5px 10px; font-size: 0.75rem; border: none; border-radius: 6px; cursor: pointer; }
         .actions .btn-check { background: #00d4aa; color: #0f0f23; }
         .actions .btn-reset { background: #2a2a4e; color: #fff; }
         .actions .btn-del { background: #ff4757; color: #fff; }
-        
-        /* Camera toggle */
-        .cam-toggle {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-            justify-content: center;
-        }
-        .cam-toggle button {
-            padding: 8px 16px;
-            border: 1px solid #2a2a4e;
-            background: #0f0f23;
-            color: #888;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.85rem;
-        }
-        .cam-toggle button.active {
-            border-color: #00d4aa;
-            color: #00d4aa;
-        }
-        
+
         .hidden { display: none !important; }
-        
-        /* Print */
+
         @media print {
             body { background: #fff; color: #000; }
-            .nav, .no-print, .card:not(#qrSection) { display: none !important; }
+            .nav, .no-print, .sync-banner, .card:not(#qrSection) { display: none !important; }
             .section { display: block !important; }
             .qr-card { break-inside: avoid; border: 1px solid #ccc; page-break-inside: avoid; }
             #qrSection { display: block !important; }
         }
-        
+
         @media (max-width: 600px) {
-            h1 { font-size: 1.3rem; }
+            h1 { font-size: 1.2rem; }
             .qr-grid { grid-template-columns: 1fr 1fr; }
             .btn-row { flex-wrap: wrap; }
+            .sync-banner { flex-direction: column; gap: 8px; text-align: center; }
         }
     </style>
+<base target="_blank">
 </head>
 <body>
     <div class="container">
         <h1>🎉 Party Ticket System</h1>
-        <p class="subtitle">Generate & Verify QR Codes for Paid Guests</p>
-        
-        <div class="nav">
-            <button class="nav-btn active" onclick="showSection('generator')">🎫 Generate</button>
-            <button class="nav-btn" onclick="showSection('scanner')">📷 Scan</button>
-            <button class="nav-btn" onclick="showSection('manage')">📋 Manage</button>
+        <p class="subtitle">Cloud-Synced QR Tickets</p>
+
+        <!-- SYNC STATUS -->
+        <div class="sync-banner" id="syncBanner">
+            <div class="sync-status">
+                <div class="sync-dot" id="syncDot"></div>
+                <span id="syncText">Connecting to cloud...</span>
+            </div>
+            <span id="deviceId" style="font-family:monospace; color:#888; font-size:0.75rem;"></span>
         </div>
-        
-        <!-- GENERATOR -->
-        <div id="generator" class="section active">
-            <div class="card">
-                <h2>Create New Ticket</h2>
-                <div class="form-group">
-                    <label>Guest Name</label>
-                    <input type="text" id="guestName" placeholder="Enter guest name..." autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label>Ticket Type</label>
-                    <select id="ticketType">
-                        <option value="General">General Admission</option>
-                        <option value="VIP">VIP Access</option>
-                        <option value="Early">Early Bird</option>
-                        <option value="Staff">Staff</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Amount Paid ($)</label>
-                    <input type="number" id="amountPaid" placeholder="0.00" min="0" step="0.01">
-                </div>
-                <button class="btn btn-primary" onclick="generateTicket()">➕ Generate Ticket</button>
+
+        <!-- MAIN APP -->
+        <div id="mainApp">
+            <div class="nav">
+                <button class="nav-btn active" onclick="showSection('generator')">🎫 Generate</button>
+                <button class="nav-btn" onclick="showSection('scanner')">📷 Scan</button>
+                <button class="nav-btn" onclick="showSection('manage')">📋 Manage</button>
             </div>
-            
-            <div class="card no-print">
-                <h2>Quick Stats</h2>
-                <div class="stats-grid">
-                    <div class="stat-box">
-                        <div class="number" id="statTotal">0</div>
-                        <div class="label">Total Tickets</div>
+
+            <!-- GENERATOR -->
+            <div id="generator" class="section active">
+                <div class="card">
+                    <h2>Create New Ticket</h2>
+                    <div class="form-group">
+                        <label>Guest Name</label>
+                        <input type="text" id="guestName" placeholder="Enter guest name..." autocomplete="off">
                     </div>
-                    <div class="stat-box">
-                        <div class="number" id="statValid">0</div>
-                        <div class="label">Valid</div>
+                    <div class="form-group">
+                        <label>Ticket Type</label>
+                        <select id="ticketType">
+                            <option value="General">General Admission</option>
+                            <option value="VIP">VIP Access</option>
+                            <option value="Early">Early Bird</option>
+                            <option value="Staff">Staff</option>
+                        </select>
                     </div>
-                    <div class="stat-box">
-                        <div class="number" id="statUsed">0</div>
-                        <div class="label">Used</div>
+                    <div class="form-group">
+                        <label>Amount Paid (₦)</label>
+                        <input type="number" id="amountPaid" placeholder="0.00" min="0" step="0.01">
                     </div>
-                    <div class="stat-box">
-                        <div class="number" id="statRevenue">$0</div>
-                        <div class="label">Revenue</div>
+                    <button class="btn btn-primary" onclick="generateTicket()">➕ Generate Ticket</button>
+                </div>
+
+                <div class="card no-print">
+                    <h2>Quick Stats</h2>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="number" id="statTotal">0</div>
+                            <div class="label">Total Tickets</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="number" id="statValid">0</div>
+                            <div class="label">Valid</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="number" id="statUsed">0</div>
+                            <div class="label">Used</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="number" id="statRevenue">$0</div>
+                            <div class="label">Revenue</div>
+                        </div>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-secondary" onclick="printTickets()">🖨️ Print</button>
+                        <button class="btn btn-secondary" onclick="exportData()">💾 Export</button>
+                        <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear</button>
                     </div>
                 </div>
-                <div class="btn-row">
-                    <button class="btn btn-secondary" onclick="printTickets()">🖨️ Print</button>
-                    <button class="btn btn-secondary" onclick="exportData()">💾 Export</button>
-                    <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear</button>
+
+                <div class="card" id="qrSection" style="display:none;">
+                    <h2 class="no-print">Generated Tickets</h2>
+                    <div id="qrContainer" class="qr-grid"></div>
                 </div>
             </div>
-            
-            <div class="card" id="qrSection" style="display:none;">
-                <h2 class="no-print">Generated Tickets</h2>
-                <div id="qrContainer" class="qr-grid"></div>
-            </div>
-        </div>
-        
-        <!-- SCANNER -->
-        <div id="scanner" class="section">
-            <div class="card">
-                <h2>Verify Ticket</h2>
-                
-                <!-- Camera Scanner -->
-                <div id="cameraScanner">
-                    <div class="cam-toggle">
-                        <button id="btnCam" class="active" onclick="switchMode('camera')">📷 Camera</button>
-                        <button id="btnFile" onclick="switchMode('file')">📁 Photo</button>
-                        <button id="btnManual" onclick="switchMode('manual')">⌨️ Type Code</button>
-                    </div>
-                    
-                    <div id="camView">
-                        <div class="scanner-container">
-                            <video id="scanVideo" playsinline></video>
-                            <div class="scanner-overlay">
-                                <div class="scan-frame">
-                                    <div class="scan-laser"></div>
+
+            <!-- SCANNER -->
+            <div id="scanner" class="section">
+                <div class="card">
+                    <h2>Verify Ticket</h2>
+                    <div id="cameraScanner">
+                        <div class="cam-toggle">
+                            <button id="btnCam" class="active" onclick="switchMode('camera')">📷 Camera</button>
+                            <button id="btnFile" onclick="switchMode('file')">📁 Photo</button>
+                            <button id="btnManual" onclick="switchMode('manual')">⌨️ Type Code</button>
+                        </div>
+                        <div id="camView">
+                            <div class="scanner-container">
+                                <video id="scanVideo" playsinline></video>
+                                <div class="scanner-overlay">
+                                    <div class="scan-frame"><div class="scan-laser"></div></div>
                                 </div>
                             </div>
+                            <p style="text-align:center; color:#888; margin-top:10px; font-size:0.85rem;">Point camera at QR code</p>
                         </div>
-                        <p style="text-align:center; color:#888; margin-top:10px; font-size:0.85rem;">
-                            Point camera at QR code inside the frame
-                        </p>
-                    </div>
-                    
-                    <div id="fileView" class="hidden">
-                        <label class="file-upload">
-                            <input type="file" id="qrFile" accept="image/*" capture="environment" onchange="scanFile(this)">
-                            <div class="file-upload-icon">📸</div>
-                            <div style="color:#fff; font-weight:600;">Tap to Take Photo</div>
-                            <div style="color:#888; font-size:0.8rem; margin-top:4px;">of the QR code</div>
-                        </label>
-                    </div>
-                    
-                    <div id="manualView" class="hidden">
-                        <div class="manual-entry">
-                            <input type="text" id="manualCode" placeholder="Enter ticket code (e.g. PT-ABC12345)" maxlength="12">
-                            <button class="btn btn-primary" onclick="verifyManual()" style="width:auto; margin:0;">Verify</button>
+                        <div id="fileView" class="hidden">
+                            <label class="file-upload">
+                                <input type="file" id="qrFile" accept="image/*" capture="environment" onchange="scanFile(this)">
+                                <div class="file-upload-icon">📸</div>
+                                <div style="color:#fff; font-weight:600;">Tap to Take Photo</div>
+                                <div style="color:#888; font-size:0.8rem;">of the QR code</div>
+                            </label>
+                        </div>
+                        <div id="manualView" class="hidden">
+                            <div class="manual-entry">
+                                <input type="text" id="manualCode" placeholder="PT-ABC12345" maxlength="12">
+                                <button class="btn btn-primary" onclick="verifyManual()" style="width:auto; margin:0;">Verify</button>
+                            </div>
                         </div>
                     </div>
+                    <div id="scanResult" class="scan-result">
+                        <div class="scan-icon" id="scanIcon">✅</div>
+                        <h3 id="scanTitle">Valid Ticket</h3>
+                        <p id="scanMessage">Welcome!</p>
+                    </div>
+                    <button class="btn btn-secondary no-print" onclick="resetScan()" id="scanAgain" style="display:none;">🔄 Scan Another</button>
                 </div>
-                
-                <div id="scanResult" class="scan-result">
-                    <div class="scan-icon" id="scanIcon">✅</div>
-                    <h3 id="scanTitle">Valid Ticket</h3>
-                    <p id="scanMessage">Welcome to the party!</p>
-                </div>
-                
-                <button class="btn btn-secondary no-print" onclick="resetScan()" id="scanAgain" style="display:none;">
-                    🔄 Scan Another
-                </button>
             </div>
-        </div>
-        
-        <!-- MANAGE -->
-        <div id="manage" class="section">
-            <div class="card">
-                <h2>All Tickets</h2>
-                <div class="form-group">
-                    <input type="text" id="searchTickets" placeholder="🔍 Search by name or code..." oninput="renderTable()">
-                </div>
-                <div style="overflow-x: auto;">
-                    <table class="ticket-table">
-                        <thead>
-                            <tr>
-                                <th>Status</th>
-                                <th>Name</th>
-                                <th>Type</th>
-                                <th>$</th>
-                                <th>Code</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="ticketTableBody"></tbody>
-                    </table>
+
+            <!-- MANAGE -->
+            <div id="manage" class="section">
+                <div class="card">
+                    <h2>All Tickets</h2>
+                    <div class="form-group">
+                        <input type="text" id="searchTickets" placeholder="🔍 Search by name or code..." oninput="renderTable()">
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="ticket-table">
+                            <thead><tr><th>Status</th><th>Name</th><th>Type</th><th>$</th><th>Code</th><th>Actions</th></tr></thead>
+                            <tbody id="ticketTableBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // ========== DATA ==========
-        let tickets = JSON.parse(localStorage.getItem('partyTickets')) || [];
+        // ========== CONFIG ==========
+        let db = null;
+        let tickets = [];
         let qrScanner = null;
         let isScanning = false;
-        
-        // ========== UTILITIES ==========
-        function generateCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            let code = '';
-            for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
-            return 'PT-' + code;
+        const deviceId = 'D-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+        document.getElementById('deviceId').textContent = deviceId;
+
+        // YOUR FIREBASE URL - AUTO CONNECT
+        const savedUrl = 'https://party-tickets-b5223-default-rtdb.firebaseio.com/';
+        initFirebase(savedUrl);
+
+        // ========== FIREBASE SETUP ==========
+        function initFirebase(url) {
+            try {
+                const config = { databaseURL: url };
+                firebase.initializeApp(config);
+                db = firebase.database();
+
+                db.ref('tickets').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    tickets = data ? Object.values(data) : [];
+                    updateUI();
+                    document.getElementById('syncText').textContent = 'Cloud Synced ✓';
+                    document.getElementById('syncDot').classList.add('online');
+                }, (err) => {
+                    console.error('Firebase error:', err);
+                    document.getElementById('syncText').textContent = 'Sync Error - Check URL';
+                });
+
+            } catch (err) {
+                document.getElementById('syncText').textContent = 'Offline Mode';
+                tickets = JSON.parse(localStorage.getItem('partyTickets')) || [];
+                updateUI();
+            }
         }
-        
-        function save() {
-            localStorage.setItem('partyTickets', JSON.stringify(tickets));
+
+        function saveToCloud() {
+            if (!db) {
+                localStorage.setItem('partyTickets', JSON.stringify(tickets));
+                return;
+            }
+            const obj = {};
+            tickets.forEach(t => { obj[t.id] = t; });
+            db.ref('tickets').set(obj);
         }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+
+        // ========== UI UPDATES ==========
+        function updateUI() {
+            updateStats();
+            renderQRs();
+            renderTable();
+            if (tickets.length > 0) {
+                document.getElementById('qrSection').style.display = 'block';
+            }
         }
-        
+
         // ========== GENERATOR ==========
         function generateTicket() {
             const name = document.getElementById('guestName').value.trim();
             const type = document.getElementById('ticketType').value;
             const amount = parseFloat(document.getElementById('amountPaid').value) || 0;
-            
+
             if (!name) { alert('Please enter a guest name'); return; }
-            
+
             const ticket = {
                 id: Date.now(),
                 code: generateCode(),
@@ -503,157 +514,129 @@
                 amount: amount,
                 status: 'valid',
                 created: new Date().toLocaleString(),
-                usedAt: null
+                usedAt: null,
+                createdBy: deviceId
             };
-            
+
             tickets.push(ticket);
-            save();
-            
+            saveToCloud();
+
             document.getElementById('guestName').value = '';
             document.getElementById('amountPaid').value = '';
-            
             document.getElementById('qrSection').style.display = 'block';
-            renderQRs();
-            updateStats();
-            renderTable();
         }
-        
+
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+            return 'PT-' + code;
+        }
+
         function renderQRs() {
             const container = document.getElementById('qrContainer');
             container.innerHTML = '';
-            
+
             tickets.forEach(t => {
                 const card = document.createElement('div');
                 card.className = 'qr-card';
-                const statusClass = t.status === 'used' ? 'used' : '';
-                
                 card.innerHTML = `
-                    <div class="status-dot ${statusClass}"></div>
+                    <div class="status-dot ${t.status === 'used' ? 'used' : ''}"></div>
                     <div class="name">${escapeHtml(t.name)}</div>
                     <div class="type">${t.type}</div>
                     <div class="code">${t.code}</div>
                     <div class="qr-wrap" id="qr-${t.id}"></div>
-                    <div style="font-size:0.7rem; color:#666;">
-                        ${t.status === 'used' ? '✓ ' + t.usedAt : 'Valid'}
-                    </div>
+                    <div style="font-size:0.7rem; color:#666;">${t.status === 'used' ? '✓ ' + t.usedAt : 'Valid'}</div>
                 `;
                 container.appendChild(card);
-                
+
                 setTimeout(() => {
-                    new QRCode(document.getElementById(`qr-${t.id}`), {
-                        text: t.code,
-                        width: 120,
-                        height: 120,
-                        colorDark: t.status === 'used' ? '#ff4757' : '#00d4aa',
-                        colorLight: '#0f0f23',
-                        correctLevel: QRCode.CorrectLevel.H
-                    });
+                    const el = document.getElementById(`qr-${t.id}`);
+                    if (el) {
+                        new QRCode(el, {
+                            text: t.code,
+                            width: 120,
+                            height: 120,
+                            colorDark: t.status === 'used' ? '#ff4757' : '#00d4aa',
+                            colorLight: '#0f0f23',
+                            correctLevel: QRCode.CorrectLevel.H
+                        });
+                    }
                 }, 10);
             });
         }
-        
+
         function updateStats() {
             const total = tickets.length;
             const valid = tickets.filter(t => t.status === 'valid').length;
             const used = tickets.filter(t => t.status === 'used').length;
             const revenue = tickets.reduce((sum, t) => sum + t.amount, 0);
-            
+
             document.getElementById('statTotal').textContent = total;
             document.getElementById('statValid').textContent = valid;
             document.getElementById('statUsed').textContent = used;
             document.getElementById('statRevenue').textContent = '$' + revenue.toFixed(2);
         }
-        
+
         // ========== SCANNER ==========
         async function initScanner() {
             if (qrScanner || isScanning) return;
-            
             const video = document.getElementById('scanVideo');
-            
+
             try {
-                // Check if camera exists
                 const hasCam = await QrScanner.hasCamera();
                 if (!hasCam) {
-                    document.getElementById('camView').innerHTML = 
-                        '<p style="color:#ff4757; text-align:center; padding:40px;">No camera found.<br>Use "Photo" or "Type Code" instead.</p>';
+                    document.getElementById('camView').innerHTML = '<p style="color:#ff4757; text-align:center; padding:40px;">No camera found.<br>Use Photo or Type Code.</p>';
                     return;
                 }
-                
-                qrScanner = new QrScanner(video, result => {
-                    handleScan(result.data);
-                }, {
-                    highlightScanRegion: true,
-                    highlightCodeOutline: true,
-                    maxScansPerSecond: 5,
-                    preferredCamera: 'environment'
+                qrScanner = new QrScanner(video, result => { handleScan(result.data); }, {
+                    highlightScanRegion: true, highlightCodeOutline: true, maxScansPerSecond: 5, preferredCamera: 'environment'
                 });
-                
                 await qrScanner.start();
                 isScanning = true;
-                
             } catch (err) {
-                console.error('Scanner init error:', err);
-                document.getElementById('camView').innerHTML = 
-                    '<p style="color:#ff4757; text-align:center; padding:40px;">Camera error: ' + err.message + '<br><br>Use "Photo" or "Type Code" instead.</p>';
+                document.getElementById('camView').innerHTML = '<p style="color:#ff4757; text-align:center; padding:40px;">Camera error: ' + err.message + '<br>Use Photo or Type Code.</p>';
             }
         }
-        
+
         async function stopScanner() {
-            if (qrScanner) {
-                await qrScanner.stop();
-                qrScanner.destroy();
-                qrScanner = null;
-                isScanning = false;
-            }
+            if (qrScanner) { await qrScanner.stop(); qrScanner.destroy(); qrScanner = null; isScanning = false; }
         }
-        
+
         function switchMode(mode) {
             document.getElementById('btnCam').classList.toggle('active', mode === 'camera');
             document.getElementById('btnFile').classList.toggle('active', mode === 'file');
             document.getElementById('btnManual').classList.toggle('active', mode === 'manual');
-            
             document.getElementById('camView').classList.toggle('hidden', mode !== 'camera');
             document.getElementById('fileView').classList.toggle('hidden', mode !== 'file');
             document.getElementById('manualView').classList.toggle('hidden', mode !== 'manual');
-            
-            if (mode === 'camera') {
-                initScanner();
-            } else {
-                stopScanner();
-            }
+            if (mode === 'camera') initScanner(); else stopScanner();
         }
-        
+
         async function scanFile(input) {
             if (!input.files || !input.files[0]) return;
-            
-            const file = input.files[0];
-            
             try {
-                const result = await QrScanner.scanImage(file, { returnDetailedScanResult: true });
+                const result = await QrScanner.scanImage(input.files[0], { returnDetailedScanResult: true });
                 handleScan(result.data);
             } catch (err) {
-                showResult('invalid', '❌', 'No QR Found', 'Could not read a QR code from this photo. Try again or type the code manually.');
+                showResult('invalid', '❌', 'No QR Found', 'Could not read QR code. Try again.');
             }
-            
-            input.value = ''; // reset for re-use
+            input.value = '';
         }
-        
+
         function verifyManual() {
             const code = document.getElementById('manualCode').value.trim().toUpperCase();
             if (!code) return;
             handleScan(code);
             document.getElementById('manualCode').value = '';
         }
-        
+
         function handleScan(code) {
             stopScanner();
-            
             const ticket = tickets.find(t => t.code === code);
             const result = document.getElementById('scanResult');
-            const againBtn = document.getElementById('scanAgain');
-            
             result.className = 'scan-result show';
-            
+
             if (!ticket) {
                 showResult('invalid', '❌', 'Invalid Ticket', 'Code not found: ' + code);
             } else if (ticket.status === 'used') {
@@ -662,45 +645,31 @@
                 showResult('valid', '✅', 'Welcome!', `${ticket.name} | ${ticket.type} | $${ticket.amount.toFixed(2)}`);
                 ticket.status = 'used';
                 ticket.usedAt = new Date().toLocaleString();
-                save();
-                updateStats();
-                renderTable();
+                ticket.checkedInBy = deviceId;
+                saveToCloud();
             }
-            
-            againBtn.style.display = 'block';
+            document.getElementById('scanAgain').style.display = 'block';
         }
-        
+
         function showResult(type, icon, title, msg) {
-            const result = document.getElementById('scanResult');
-            result.className = 'scan-result show ' + type;
+            document.getElementById('scanResult').className = 'scan-result show ' + type;
             document.getElementById('scanIcon').textContent = icon;
             document.getElementById('scanTitle').textContent = title;
             document.getElementById('scanMessage').textContent = msg;
         }
-        
+
         function resetScan() {
             document.getElementById('scanResult').className = 'scan-result';
             document.getElementById('scanAgain').style.display = 'none';
-            
-            // Restart camera if in camera mode
-            if (document.getElementById('btnCam').classList.contains('active')) {
-                initScanner();
-            }
+            if (document.getElementById('btnCam').classList.contains('active')) initScanner();
         }
-        
+
         // ========== MANAGE ==========
         function renderTable() {
             const tbody = document.getElementById('ticketTableBody');
             const search = document.getElementById('searchTickets').value.toLowerCase();
-            
-            let filtered = tickets;
-            if (search) {
-                filtered = tickets.filter(t => 
-                    t.name.toLowerCase().includes(search) || 
-                    t.code.toLowerCase().includes(search)
-                );
-            }
-            
+            let filtered = search ? tickets.filter(t => t.name.toLowerCase().includes(search) || t.code.toLowerCase().includes(search)) : tickets;
+
             tbody.innerHTML = filtered.map(t => `
                 <tr>
                     <td><span class="badge badge-${t.status}">${t.status}</span></td>
@@ -720,72 +689,49 @@
                 </tr>
             `).join('');
         }
-        
+
         function markUsed(id) {
             const t = tickets.find(x => x.id === id);
-            if (t) { t.status = 'used'; t.usedAt = new Date().toLocaleString(); save(); updateStats(); renderTable(); renderQRs(); }
+            if (t) { t.status = 'used'; t.usedAt = new Date().toLocaleString(); t.checkedInBy = deviceId; saveToCloud(); }
         }
-        
         function markValid(id) {
             const t = tickets.find(x => x.id === id);
-            if (t) { t.status = 'valid'; t.usedAt = null; save(); updateStats(); renderTable(); renderQRs(); }
+            if (t) { t.status = 'valid'; t.usedAt = null; saveToCloud(); }
         }
-        
         function deleteTicket(id) {
             if (confirm('Delete this ticket?')) {
                 tickets = tickets.filter(t => t.id !== id);
-                save(); updateStats(); renderTable(); renderQRs();
+                saveToCloud();
                 if (tickets.length === 0) document.getElementById('qrSection').style.display = 'none';
             }
         }
-        
         function clearAll() {
-            if (confirm('Delete ALL tickets?')) {
-                tickets = []; save();
-                document.getElementById('qrSection').style.display = 'none';
-                updateStats(); renderTable();
-            }
+            if (confirm('Delete ALL tickets?')) { tickets = []; saveToCloud(); document.getElementById('qrSection').style.display = 'none'; }
         }
-        
         function exportData() {
             const data = JSON.stringify(tickets, null, 2);
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = `party-tickets-${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
+            a.href = url; a.download = `party-tickets-${new Date().toISOString().slice(0,10)}.json`; a.click();
             URL.revokeObjectURL(url);
         }
-        
-        function printTickets() {
-            window.print();
-        }
-        
+        function printTickets() { window.print(); }
+
         // ========== NAVIGATION ==========
         function showSection(name) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            
             document.getElementById(name).classList.add('active');
             event.target.classList.add('active');
-            
-            if (name === 'scanner') {
-                // Default to camera mode
-                switchMode('camera');
-            } else {
-                stopScanner();
-                resetScan();
-            }
+            if (name === 'scanner') switchMode('camera'); else { stopScanner(); resetScan(); }
         }
-        
-        // ========== INIT ==========
-        updateStats();
-        if (tickets.length > 0) {
-            document.getElementById('qrSection').style.display = 'block';
-            renderQRs();
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
-        renderTable();
     </script>
 </body>
 </html>
